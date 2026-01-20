@@ -1,12 +1,15 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
+import ConfirmDeleteModal from '@/Components/ConfirmDeleteModal';
 
 export default function RolesPermissions() {
     const { roles = [], permissions = [] } = usePage().props;
 
     const [showingModal, setShowingModal] = useState(false);
     const [editingRole, setEditingRole] = useState(null);
+    const [showingConfirmDeleteModal, setShowingConfirmDeleteModal] = useState(false);
+    const [roleToDelete, setRoleToDelete] = useState(null);
 
     const {
         data,
@@ -58,11 +61,19 @@ export default function RolesPermissions() {
     };
 
     const handleDelete = (role) => {
-        if (!confirm(`Delete role "${role.name}"?`)) {
-            return;
-        }
+        setRoleToDelete(role);
+        setShowingConfirmDeleteModal(true);
+    };
 
-        destroy(route('settings.roles-permissions.destroy', role.id));
+    const confirmDelete = () => {
+        if (roleToDelete) {
+            destroy(route('settings.roles-permissions.destroy', roleToDelete.id), {
+                onSuccess: () => {
+                    setShowingConfirmDeleteModal(false);
+                    setRoleToDelete(null);
+                },
+            });
+        }
     };
 
     const togglePermission = (permissionId) => {
@@ -85,7 +96,7 @@ export default function RolesPermissions() {
                 </h2>
             }
         >
-            <Head title="Roles & Permissions" />
+            <Head title="Roles & Permissions - WanWokabaot Connect" />
 
             <div className="py-12">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
@@ -287,6 +298,13 @@ export default function RolesPermissions() {
                     </div>
                 </div>
             )}
+
+            <ConfirmDeleteModal
+                show={showingConfirmDeleteModal}
+                onClose={() => setShowingConfirmDeleteModal(false)}
+                onConfirm={confirmDelete}
+                message={roleToDelete ? `Are you sure you want to delete role "${roleToDelete.name}"? This action cannot be undone.` : ''}
+            />
         </AuthenticatedLayout>
     );
 }

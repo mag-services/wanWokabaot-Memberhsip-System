@@ -88,7 +88,7 @@ export default function Users() {
                 </h2>
             }
         >
-            <Head title="User Management" />
+            <Head title="User Management - WanWokabaot Connect" />
 
             <div className="py-12">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">

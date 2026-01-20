@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, usePage, useForm, router } from '@inertiajs/react';
+import ConfirmDeleteModal from '@/Components/ConfirmDeleteModal';
 
 export default function Index() {
     const { auth, products = [], sortBy, sortDirection } = usePage().props;
 
     const [showingModal, setShowingModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
+    const [showingConfirmDeleteModal, setShowingConfirmDeleteModal] = useState(false);
+    const [productToDelete, setProductToDelete] = useState(null);
 
     const {
         data,
@@ -68,11 +71,19 @@ export default function Index() {
     };
 
     const handleDelete = (product) => {
-        if (!confirm(`Delete item "${product.name}"?`)) {
-            return;
-        }
+        setProductToDelete(product);
+        setShowingConfirmDeleteModal(true);
+    };
 
-        destroy(route('web.inventory.destroy', product.id));
+    const confirmDelete = () => {
+        if (productToDelete) {
+            destroy(route('web.inventory.destroy', productToDelete.id), {
+                onSuccess: () => {
+                    setShowingConfirmDeleteModal(false);
+                    setProductToDelete(null);
+                },
+            });
+        }
     };
 
     const handleSort = (column) => {
@@ -138,7 +149,7 @@ export default function Index() {
             user={auth.user}
             header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Inventory</h2>}
         >
-            <Head title="Inventory" />
+            <Head title="Inventory - WanWokabaot Connect" />
 
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -520,6 +531,13 @@ export default function Index() {
                     </div>
                 </div>
             )}
+
+            <ConfirmDeleteModal
+                show={showingConfirmDeleteModal}
+                onClose={() => setShowingConfirmDeleteModal(false)}
+                onConfirm={confirmDelete}
+                message={productToDelete ? `Are you sure you want to delete item "${productToDelete.name}"? This action cannot be undone.` : ''}
+            />
         </AuthenticatedLayout>
     );
 }

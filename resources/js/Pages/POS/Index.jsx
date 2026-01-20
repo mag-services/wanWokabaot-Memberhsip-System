@@ -1,12 +1,16 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, usePage } from '@inertiajs/react';
 import { useState, useMemo } from 'react';
+import NotificationModal from '@/Components/NotificationModal';
 
 export default function POS() {
     const { products: initialProducts } = usePage().props;
     const [searchTerm, setSearchTerm] = useState('');
     const [cart, setCart] = useState([]);
     const [paymentMethod, setPaymentMethod] = useState('cash');
+    const [showingNotificationModal, setShowingNotificationModal] = useState(false);
+    const [notificationMessage, setNotificationMessage] = useState('');
+    const [notificationType, setNotificationType] = useState('info');
 
     const filteredProducts = useMemo(() => {
         if (!searchTerm) {
@@ -58,13 +62,24 @@ export default function POS() {
     const handleCheckout = () => {
         // Placeholder for actual checkout logic
         if (cart.length === 0) {
-            alert('Your cart is empty.');
+            setNotificationMessage('Your cart is empty.');
+            setNotificationType('warning');
+            setShowingNotificationModal(true);
             return;
         }
-        alert(
+
+        setNotificationMessage(
             `Checking out with total: $${calculateTotal.toFixed(2)} using ${paymentMethod}. (This is a placeholder.)`,
         );
+        setNotificationType('info');
+        setShowingNotificationModal(true);
         setCart([]); // Clear cart after checkout (placeholder)
+    };
+
+    const closeNotificationModal = () => {
+        setShowingNotificationModal(false);
+        setNotificationMessage('');
+        setNotificationType('info');
     };
 
     return (
@@ -75,7 +90,7 @@ export default function POS() {
                 </h2>
             }
         >
-            <Head title="Point of Sale" />
+            <Head title="Point of Sale - WanWokabaot Connect" />
 
             <div className="py-6">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
@@ -224,6 +239,13 @@ export default function POS() {
                     </div>
                 </div>
             </div>
+
+            <NotificationModal
+                show={showingNotificationModal}
+                onClose={closeNotificationModal}
+                message={notificationMessage}
+                type={notificationType}
+            />
         </AuthenticatedLayout>
     );
 }

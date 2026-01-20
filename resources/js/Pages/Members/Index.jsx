@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage, router } from '@inertiajs/react';
+import ConfirmDeleteModal from '@/Components/ConfirmDeleteModal';
 
 export default function Index() {
     const { auth, members = [], sortBy, sortDirection } = usePage().props;
 
     const [showingModal, setShowingModal] = useState(false);
     const [editingMember, setEditingMember] = useState(null);
+    const [showingConfirmDeleteModal, setShowingConfirmDeleteModal] = useState(false);
+    const [memberToDelete, setMemberToDelete] = useState(null);
 
     const {
         data,
@@ -68,11 +71,19 @@ export default function Index() {
     };
 
     const handleDelete = (member) => {
-        if (!confirm(`Delete member "${member.name}"?`)) {
-            return;
-        }
+        setMemberToDelete(member);
+        setShowingConfirmDeleteModal(true);
+    };
 
-        destroy(route('web.members.destroy', member.id));
+    const confirmDelete = () => {
+        if (memberToDelete) {
+            destroy(route('web.members.destroy', memberToDelete.id), {
+                onSuccess: () => {
+                    setShowingConfirmDeleteModal(false);
+                    setMemberToDelete(null);
+                },
+            });
+        }
     };
 
     const handleSort = (column) => {
@@ -142,7 +153,7 @@ export default function Index() {
                 </h2>
             }
         >
-            <Head title="Members" />
+            <Head title="Members - WanWokabaot Connect" />
 
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -491,6 +502,13 @@ export default function Index() {
                     </div>
                 </div>
             )}
+
+            <ConfirmDeleteModal
+                show={showingConfirmDeleteModal}
+                onClose={() => setShowingConfirmDeleteModal(false)}
+                onConfirm={confirmDelete}
+                message={memberToDelete ? `Are you sure you want to delete member "${memberToDelete.name}"? This action cannot be undone.` : ''}
+            />
         </AuthenticatedLayout>
     );
 }

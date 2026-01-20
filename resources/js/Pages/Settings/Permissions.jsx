@@ -12,7 +12,7 @@ export default function Permissions() {
                 </h2>
             }
         >
-            <Head title="Permissions" />
+            <Head title="Permissions - WanWokabaot Connect" />
 
             <div className="py-12">
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
