@@ -4,13 +4,14 @@ import { useState, useMemo } from 'react';
 import NotificationModal from '@/Components/NotificationModal';
 
 export default function POS() {
-    const { products: initialProducts } = usePage().props;
+    const { products: initialProducts, members: initialMembers } = usePage().props;
     const [searchTerm, setSearchTerm] = useState('');
     const [cart, setCart] = useState([]);
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [showingNotificationModal, setShowingNotificationModal] = useState(false);
     const [notificationMessage, setNotificationMessage] = useState('');
     const [notificationType, setNotificationType] = useState('info');
+    const [selectedMemberId, setSelectedMemberId] = useState('');
 
     const filteredProducts = useMemo(() => {
         if (!searchTerm) {
@@ -60,7 +61,6 @@ export default function POS() {
     }, [cart]);
 
     const handleCheckout = () => {
-        // Placeholder for actual checkout logic
         if (cart.length === 0) {
             setNotificationMessage('Your cart is empty.');
             setNotificationType('warning');
@@ -68,12 +68,34 @@ export default function POS() {
             return;
         }
 
-        setNotificationMessage(
-            `Checking out with total: $${calculateTotal.toFixed(2)} using ${paymentMethod}. (This is a placeholder.)`,
-        );
-        setNotificationType('info');
-        setShowingNotificationModal(true);
-        setCart([]); // Clear cart after checkout (placeholder)
+        router.post(route('web.pos.processSale'), {
+            member_id: selectedMemberId === '' ? null : selectedMemberId,
+            cart: cart.map(item => ({
+                id: item.id,
+                quantity: item.quantity,
+            })),
+            total: calculateTotal.toFixed(2),
+            payment_method: paymentMethod,
+        }, {
+            onSuccess: (page) => {
+                setCart([]);
+                setSelectedMemberId('');
+                if (page.props.flash.success) {
+                    setNotificationMessage(page.props.flash.success);
+                    setNotificationType('success');
+                } else if (page.props.flash.error) {
+                    setNotificationMessage(page.props.flash.error);
+                    setNotificationType('error');
+                }
+                setShowingNotificationModal(true);
+            },
+            onError: (errors) => {
+                const errorMessages = Object.values(errors).flat().join('\n');
+                setNotificationMessage(errorMessages || 'An unknown error occurred during checkout.');
+                setNotificationType('error');
+                setShowingNotificationModal(true);
+            },
+        });
     };
 
     const closeNotificationModal = () => {
@@ -129,7 +151,7 @@ export default function POS() {
                                                     Stock: {product.current_stock}
                                                 </p>
                                                 <p className="mt-1 text-sm font-semibold text-indigo-600">
-                                                    ${product.selling_price}
+                                                    VT{product.selling_price}
                                                 </p>
                                             </div>
                                         ))}
@@ -160,7 +182,7 @@ export default function POS() {
                                                         {item.name}
                                                     </p>
                                                     <p className="text-xs text-gray-500">
-                                                        ${item.selling_price}
+                                                        VT{item.selling_price}
                                                     </p>
                                                 </div>
                                                 <div className="flex items-center space-x-2">
@@ -211,7 +233,7 @@ export default function POS() {
                             <div className="mt-4 border-t border-gray-200 pt-4">
                                 <div className="mb-3 flex items-center justify-between text-lg font-semibold text-gray-900">
                                     <span>Total:</span>
-                                    <span>${calculateTotal.toFixed(2)}</span>
+                                    <span>VT{calculateTotal.toFixed(2)}</span>
                                 </div>
                                 <label className="mb-2 block text-sm font-medium text-gray-700">
                                     Payment Method

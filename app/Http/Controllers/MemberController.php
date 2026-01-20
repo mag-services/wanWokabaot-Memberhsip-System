@@ -12,29 +12,10 @@ class MemberController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Member::query();
-
-        // Handle sorting
-        $sortBy = $request->get('sort_by', 'id');
-        $sortDirection = $request->get('sort_direction', 'asc');
-
-        // Validate sort column
-        $allowedSortColumns = ['id', 'name', 'email', 'join_date', 'status', 'total_spent'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
-            $sortBy = 'id';
-        }
-
-        // Validate sort direction
-        if (!in_array($sortDirection, ['asc', 'desc'])) {
-            $sortDirection = 'asc';
-        }
-
-        $members = $query->orderBy($sortBy, $sortDirection)->get();
+        $members = Member::all();
 
         return Inertia::render('Members/Index', [
             'members' => $members,
-            'sortBy' => $sortBy,
-            'sortDirection' => $sortDirection,
         ]);
     }
 

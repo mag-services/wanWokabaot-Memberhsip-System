@@ -12,38 +12,10 @@ class InventoryController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Product::query();
-
-        // Handle sorting
-        $sortBy = $request->get('sort_by', 'id');
-        $sortDirection = $request->get('sort_direction', 'asc');
-
-        // Validate sort column
-        $allowedSortColumns = [
-            'id',
-            'name',
-            'category',
-            'selling_price',
-            'cost_price',
-            'current_stock',
-            'min_stock',
-            'unit',
-        ];
-        if (!in_array($sortBy, $allowedSortColumns)) {
-            $sortBy = 'id';
-        }
-
-        // Validate sort direction
-        if (!in_array($sortDirection, ['asc', 'desc'])) {
-            $sortDirection = 'asc';
-        }
-
-        $products = $query->orderBy($sortBy, $sortDirection)->get();
+        $products = Product::all();
 
         return Inertia::render('Inventory/Index', [
             'products' => $products,
-            'sortBy' => $sortBy,
-            'sortDirection' => $sortDirection,
         ]);
     }
 

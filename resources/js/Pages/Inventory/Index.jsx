@@ -1,15 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, usePage, useForm, router } from '@inertiajs/react';
 import ConfirmDeleteModal from '@/Components/ConfirmDeleteModal';
+import DataTable from 'react-data-table-component';
+import styled from 'styled-components';
+
+const FilterField = styled.input.attrs(props => ({
+    type: 'text',
+    placeholder: 'Filter inventory...',
+    'aria-label': 'Search Input',
+}))`
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #d1d5db;
+    font-size: 14px;
+    &:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 1px #6366f1;
+    }
+`;
+
+const customStyles = {
+    headCells: {
+        style: {
+            fontWeight: 'bold',
+            fontSize: '14px',
+            backgroundColor: '#f9fafb',
+            color: '#4b5563',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+        },
+    },
+    cells: {
+        style: {
+            fontSize: '14px',
+            color: '#374151',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+        },
+    },
+    rows: {
+        highlightOnHoverStyle: {
+            backgroundColor: '#f3f4f6',
+        },
+    },
+};
+
 
 export default function Index() {
-    const { auth, products = [], sortBy, sortDirection } = usePage().props;
+    const { auth, products: initialProducts } = usePage().props;
 
     const [showingModal, setShowingModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [showingConfirmDeleteModal, setShowingConfirmDeleteModal] = useState(false);
     const [productToDelete, setProductToDelete] = useState(null);
+    const [filterText, setFilterText] = useState('');
+    const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
+
+    const filteredProducts = useMemo(() => {
+        return initialProducts.filter(
+            (product) =>
+                (product.name && product.name.toLowerCase().includes(filterText.toLowerCase())) ||
+                (product.category && product.category.toLowerCase().includes(filterText.toLowerCase()))
+        );
+    }, [initialProducts, filterText]);
+
+    const handleClearFilter = () => {
+        if (filterText) {
+            setResetPaginationToggle(!resetPaginationToggle);
+            setFilterText('');
+        }
+    };
+
 
     const {
         data,
@@ -70,8 +133,8 @@ export default function Index() {
         }
     };
 
-    const handleDelete = (product) => {
-        setProductToDelete(product);
+    const handleDelete = (row) => {
+        setProductToDelete(row);
         setShowingConfirmDeleteModal(true);
     };
 
@@ -86,63 +149,106 @@ export default function Index() {
         }
     };
 
-    const handleSort = (column) => {
-        const newDirection =
-            sortBy === column && sortDirection === 'asc' ? 'desc' : 'asc';
-        router.get(route('web.inventory.index'), {
-            sort_by: column,
-            sort_direction: newDirection,
-        });
-    };
+    const columns = useMemo(
+        () => [
+            {
+                name: 'Name',
+                selector: (row) => row.name,
+                sortable: true,
+            },
+            {
+                name: 'Category',
+                selector: (row) => row.category,
+                sortable: true,
+            },
+            {
+                name: 'Selling Price',
+                selector: (row) => `VT${row.selling_price ?? '0.00'}`,
+                sortable: true,
+                right: true,
+            },
+            {
+                name: 'Cost Price',
+                selector: (row) => `VT${row.cost_price ?? '0.00'}`,
+                sortable: true,
+                right: true,
+            },
+            {
+                name: 'Current Stock',
+                selector: (row) => row.current_stock,
+                sortable: true,
+                right: true,
+            },
+            {
+                name: 'Min. Stock',
+                selector: (row) => row.min_stock,
+                sortable: true,
+                right: true,
+            },
+            {
+                name: 'Unit',
+                selector: (row) => row.unit,
+                sortable: true,
+            },
+            {
+                name: 'Actions',
+                cell: (row) => (
+                    <div className="flex items-center justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => openEditModal(row)}
+                            className="font-medium text-indigo-600 hover:text-indigo-900 focus:outline-none focus:underline"
+                        >
+                            Edit
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleDelete(row)}
+                            className="font-medium text-red-600 hover:text-red-800 focus:outline-none focus:underline"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                ),
+                right: true,
+                ignoreRowClick: true,
+                allowOverflow: true,
+                button: true,
+            },
+        ],
+        [openEditModal, handleDelete],
+    );
 
-    const SortIcon = ({ column }) => {
-        if (sortBy !== column) {
-            return (
-                <svg
-                    className="ml-1 h-4 w-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                    />
-                </svg>
-            );
-        }
-        return sortDirection === 'asc' ? (
-            <svg
-                className="ml-1 h-4 w-4 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
+    const SubHeaderComponent = useMemo(() => {
+        return (
+            <div className="flex items-center justify-between w-full mb-4">
+                <FilterField
+                    id="search"
+                    type="text"
+                    placeholder="Filter inventory..."
+                    aria-label="Search Input"
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
                 />
-            </svg>
-        ) : (
-            <svg
-                className="ml-1 h-4 w-4 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                />
-            </svg>
+                <div className="flex items-center space-x-2">
+                    <button
+                        type="button"
+                        onClick={handleClearFilter}
+                        className="rounded-md bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
+                    >
+                        Clear
+                    </button>
+                    <button
+                        type="button"
+                        onClick={openCreateModal}
+                        className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                    >
+                        Add Item
+                    </button>
+                </div>
+            </div>
         );
-    };
+    }, [filterText, handleClearFilter, openCreateModal]);
 
     return (
         <AuthenticatedLayout
@@ -160,177 +266,26 @@ export default function Index() {
                                     Inventory Items
                                 </h3>
                                 <p className="mt-1 text-sm text-gray-500">
-                                    Manage your product inventory. Click column
-                                    headers to sort.
+                                    Manage your product inventory.
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={openCreateModal}
-                                className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                            >
-                                Add Item
-                            </button>
+                            {/* Add Item button is now in SubHeaderComponent */}
                         </div>
                         <div className="p-6 bg-white border-b border-gray-200">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() => handleSort('name')}
-                                            >
-                                                <div className="flex items-center">
-                                                    Name
-                                                    <SortIcon column="name" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() =>
-                                                    handleSort('category')
-                                                }
-                                            >
-                                                <div className="flex items-center">
-                                                    Category
-                                                    <SortIcon column="category" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() =>
-                                                    handleSort('selling_price')
-                                                }
-                                            >
-                                                <div className="flex items-center justify-end">
-                                                    Selling Price
-                                                    <SortIcon column="selling_price" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() =>
-                                                    handleSort('cost_price')
-                                                }
-                                            >
-                                                <div className="flex items-center justify-end">
-                                                    Cost Price
-                                                    <SortIcon column="cost_price" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() =>
-                                                    handleSort('current_stock')
-                                                }
-                                            >
-                                                <div className="flex items-center justify-end">
-                                                    Current Stock
-                                                    <SortIcon column="current_stock" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() =>
-                                                    handleSort('min_stock')
-                                                }
-                                            >
-                                                <div className="flex items-center justify-end">
-                                                    Min. Stock
-                                                    <SortIcon column="min_stock" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() => handleSort('unit')}
-                                            >
-                                                <div className="flex items-center">
-                                                    Unit
-                                                    <SortIcon column="unit" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                            >
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {products.length === 0 ? (
-                                            <tr>
-                                                <td
-                                                    colSpan="8"
-                                                    className="px-6 py-4 text-center text-sm text-gray-500"
-                                                >
-                                                    No inventory items found.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            products.map((product) => (
-                                                <tr key={product.id}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                        {product.name}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {product.category}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                                                        {product.selling_price}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                                                        {product.cost_price}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                                                        {product.current_stock}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                                                        {product.min_stock}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {product.unit}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <div className="flex items-center justify-end gap-3">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    openEditModal(
-                                                                        product,
-                                                                    )
-                                                                }
-                                                                className="font-medium text-indigo-600 hover:text-indigo-900 focus:outline-none focus:underline"
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    handleDelete(
-                                                                        product,
-                                                                    )
-                                                                }
-                                                                className="font-medium text-red-600 hover:text-red-800 focus:outline-none focus:underline"
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <DataTable
+                                columns={columns}
+                                data={filteredProducts}
+                                pagination
+                                paginationPerPage={10}
+                                paginationRowsPerPageOptions={[10, 20, 50, 100]}
+                                highlightOnHover
+                                pointerOnHover
+                                customStyles={customStyles}
+                                subHeader
+                                subHeaderComponent={SubHeaderComponent}
+                                persistTableHead
+                                noDataComponent="No inventory items found"
+                            />
                         </div>
                     </div>
                 </div>

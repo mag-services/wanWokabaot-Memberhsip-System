@@ -1,15 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage, router } from '@inertiajs/react';
 import ConfirmDeleteModal from '@/Components/ConfirmDeleteModal';
+import DataTable from 'react-data-table-component';
+import styled from 'styled-components';
+
+const FilterField = styled.input.attrs(props => ({
+    type: 'text',
+    placeholder: 'Filter members...',
+    'aria-label': 'Search Input',
+}))`
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #d1d5db;
+    font-size: 14px;
+    &:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 1px #6366f1;
+    }
+`;
+
+const customStyles = {
+    headCells: {
+        style: {
+            fontWeight: 'bold',
+            fontSize: '14px',
+            backgroundColor: '#f9fafb',
+            color: '#4b5563',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+        },
+    },
+    cells: {
+        style: {
+            fontSize: '14px',
+            color: '#374151',
+            paddingLeft: '16px',
+            paddingRight: '16px',
+        },
+    },
+    rows: {
+        highlightOnHoverStyle: {
+            backgroundColor: '#f3f4f6',
+        },
+    },
+};
 
 export default function Index() {
-    const { auth, members = [], sortBy, sortDirection } = usePage().props;
-
-    const [showingModal, setShowingModal] = useState(false);
-    const [editingMember, setEditingMember] = useState(null);
-    const [showingConfirmDeleteModal, setShowingConfirmDeleteModal] = useState(false);
-    const [memberToDelete, setMemberToDelete] = useState(null);
+    const { auth, members: initialMembers } = usePage().props;
 
     const {
         data,
@@ -30,22 +69,44 @@ export default function Index() {
         notes: '',
     });
 
+    const [showingModal, setShowingModal] = useState(false);
+    const [editingMember, setEditingMember] = useState(null);
+    const [showingConfirmDeleteModal, setShowingConfirmDeleteModal] = useState(false);
+    const [memberToDelete, setMemberToDelete] = useState(null);
+    const [filterText, setFilterText] = useState('');
+    const [resetPaginationToggle, setResetPaginationToggle] = useState(false);
+
+    const filteredMembers = useMemo(() => {
+        return initialMembers.filter(
+            (member) =>
+                (member.name && member.name.toLowerCase().includes(filterText.toLowerCase())) ||
+                (member.email && member.email.toLowerCase().includes(filterText.toLowerCase()))
+        );
+    }, [initialMembers, filterText]);
+
+    const handleClearFilter = () => {
+        if (filterText) {
+            setResetPaginationToggle(!resetPaginationToggle);
+            setFilterText('');
+        }
+    };
+
     const openCreateModal = () => {
         setEditingMember(null);
         reset();
         setShowingModal(true);
     };
 
-    const openEditModal = (member) => {
-        setEditingMember(member);
+    const openEditModal = (row) => {
+        setEditingMember(row);
         setData({
-            name: member.name || '',
-            email: member.email || '',
-            phone: member.phone || '',
-            member_code: member.member_code || '',
-            join_date: member.join_date || '',
-            status: member.status || 'active',
-            notes: member.notes || '',
+            name: row.name || '',
+            email: row.email || '',
+            phone: row.phone || '',
+            member_code: row.member_code || '',
+            join_date: row.join_date || '',
+            status: row.status || 'active',
+            notes: row.notes || '',
         });
         setShowingModal(true);
     };
@@ -70,8 +131,8 @@ export default function Index() {
         }
     };
 
-    const handleDelete = (member) => {
-        setMemberToDelete(member);
+    const handleDelete = (row) => {
+        setMemberToDelete(row);
         setShowingConfirmDeleteModal(true);
     };
 
@@ -86,63 +147,122 @@ export default function Index() {
         }
     };
 
-    const handleSort = (column) => {
-        const newDirection =
-            sortBy === column && sortDirection === 'asc' ? 'desc' : 'asc';
-        router.get(route('web.members.index'), {
-            sort_by: column,
-            sort_direction: newDirection,
-        });
-    };
+    const columns = useMemo(
+        () => [
+            {
+                name: 'Name',
+                selector: (row) => row.name,
+                sortable: true,
+            },
+            {
+                name: 'Email',
+                selector: (row) => row.email,
+                sortable: true,
+            },
+            {
+                name: 'Join Date',
+                selector: (row) => row.join_date,
+                sortable: true,
+            },
+            {
+                name: 'Status',
+                selector: (row) => row.status,
+                sortable: true,
+                cell: (row) => (
+                    <span
+                        className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                            row.status === 'active'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                        }`}
+                    >
+                        {row.status}
+                    </span>
+                ),
+            },
+            {
+                name: 'Total Spent',
+                selector: (row) => row.total_spent,
+                sortable: true,
+                right: true,
+                cell: (row) => `VT${row.total_spent ?? '0.00'}`,
+            },
+            {
+                name: 'Unpaid Amount',
+                selector: (row) => row.unpaid_total,
+                sortable: true,
+                right: true,
+                cell: (row) => `VT${row.unpaid_total ?? '0.00'}`,
+                conditionalCellStyles: [
+                    {
+                        when: row => parseFloat(row.unpaid_total) >= 2000,
+                        style: { backgroundColor: '#fecaca', color: '#b91c1c' }, // Red-200, Red-800
+                    },
+                    {
+                        when: row => parseFloat(row.unpaid_total) > 0 && parseFloat(row.unpaid_total) < 2000,
+                        style: { backgroundColor: '#fee2e2', color: '#ef4444' }, // Red-100, Red-500
+                    },
+                ],
+            },
+            {
+                name: 'Actions',
+                cell: (row) => (
+                    <div className="flex items-center justify-end gap-3">
+                        <button
+                            type="button"
+                            onClick={() => openEditModal(row)}
+                            className="font-medium text-indigo-600 hover:text-indigo-900 focus:outline-none focus:underline"
+                        >
+                            Edit
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleDelete(row)}
+                            className="font-medium text-red-600 hover:text-red-800 focus:outline-none focus:underline"
+                        >
+                            Delete
+                        </button>
+                    </div>
+                ),
+                right: true,
+                ignoreRowClick: true,
+                allowOverflow: true,
+                button: true,
+            },
+        ],
+        [openEditModal, handleDelete],
+    );
 
-    const SortIcon = ({ column }) => {
-        if (sortBy !== column) {
-            return (
-                <svg
-                    className="ml-1 h-4 w-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                >
-                    <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-                    />
-                </svg>
-            );
-        }
-        return sortDirection === 'asc' ? (
-            <svg
-                className="ml-1 h-4 w-4 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 15l7-7 7 7"
+    const SubHeaderComponent = useMemo(() => {
+        return (
+            <div className="flex items-center justify-between w-full mb-4">
+                <FilterField
+                    id="search"
+                    type="text"
+                    placeholder="Filter members..."
+                    aria-label="Search Input"
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
                 />
-            </svg>
-        ) : (
-            <svg
-                className="ml-1 h-4 w-4 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-            >
-                <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                />
-            </svg>
+                <div className="flex items-center space-x-2">
+                    <button
+                        type="button"
+                        onClick={handleClearFilter}
+                        className="rounded-md bg-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-300 focus-visible:outline focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2"
+                    >
+                        Clear
+                    </button>
+                    <button
+                        type="button"
+                        onClick={openCreateModal}
+                        className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
+                    >
+                        Add Member
+                    </button>
+                </div>
+            </div>
         );
-    };
+    }, [filterText, handleClearFilter, openCreateModal]);
 
     return (
         <AuthenticatedLayout
@@ -164,157 +284,25 @@ export default function Index() {
                                     Members
                                 </h3>
                                 <p className="mt-1 text-sm text-gray-500">
-                                    Manage members. Click column headers to sort.
+                                    Manage members.
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={openCreateModal}
-                                className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-                            >
-                                Add Member
-                            </button>
                         </div>
                         <div className="p-6 bg-white border-b border-gray-200">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() => handleSort('name')}
-                                            >
-                                                <div className="flex items-center">
-                                                    Name
-                                                    <SortIcon column="name" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() => handleSort('email')}
-                                            >
-                                                <div className="flex items-center">
-                                                    Email
-                                                    <SortIcon column="email" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() => handleSort('join_date')}
-                                            >
-                                                <div className="flex items-center">
-                                                    Join Date
-                                                    <SortIcon column="join_date" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() => handleSort('status')}
-                                            >
-                                                <div className="flex items-center">
-                                                    Status
-                                                    <SortIcon column="status" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                                                onClick={() => handleSort('total_spent')}
-                                            >
-                                                <div className="flex items-center justify-end">
-                                                    Total Spent
-                                                    <SortIcon column="total_spent" />
-                                                </div>
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                            >
-                                                Unpaid Amount
-                                            </th>
-                                            <th
-                                                scope="col"
-                                                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                                            >
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {members.length === 0 ? (
-                                            <tr>
-                                                <td
-                                                    colSpan="7"
-                                                    className="px-6 py-4 text-center text-sm text-gray-500"
-                                                >
-                                                    No members found.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            members.map((member) => (
-                                                <tr key={member.id}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                        {member.name}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {member.email}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        {member.join_date}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <span
-                                                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                                                                member.status === 'active'
-                                                                    ? 'bg-green-100 text-green-800'
-                                                                    : 'bg-gray-100 text-gray-800'
-                                                            }`}
-                                                        >
-                                                            {member.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                                        {member.total_spent ?? '0.00'}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                                                        {member.unpaid_total ?? '0.00'}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                        <div className="flex items-center justify-end gap-3">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    openEditModal(
-                                                                        member,
-                                                                    )
-                                                                }
-                                                                className="font-medium text-indigo-600 hover:text-indigo-900 focus:outline-none focus:underline"
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() =>
-                                                                    handleDelete(
-                                                                        member,
-                                                                    )
-                                                                }
-                                                                className="font-medium text-red-600 hover:text-red-800 focus:outline-none focus:underline"
-                                                            >
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <DataTable
+                                columns={columns}
+                                data={filteredMembers}
+                                pagination
+                                paginationPerPage={10}
+                                paginationRowsPerPageOptions={[10, 20, 50, 100]}
+                                highlightOnHover
+                                pointerOnHover
+                                customStyles={customStyles}
+                                subHeader
+                                subHeaderComponent={SubHeaderComponent}
+                                persistTableHead
+                                noDataComponent="No members found"
+                            />
                         </div>
                     </div>
                 </div>

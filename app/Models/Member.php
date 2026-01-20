@@ -17,6 +17,7 @@ class Member extends Model
         'join_date',
         'status',
         'notes',
+        'balance',
     ];
 
     protected $casts = [
@@ -29,6 +30,6 @@ class Member extends Model
      */
     public function getUnpaidTotalAttribute(): string
     {
-        return '0.00';
+        return number_format($this->balance, 2);
     }
 }
